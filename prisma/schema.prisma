@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Restaurant {
+  id        String     @id
+  name      String
+  cuisine   String
+  address   String
+  city      String
+  rating    Float
+  isOpen    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  menuItems MenuItem[]
+  orders    Order[]
+
+  @@index([cuisine])
+  @@index([city])
+  @@index([rating])
+}
+
+model MenuItem {
+  id           String      @id
+  restaurantId String
+  name         String
+  description  String
+  category     String
+  priceInCents Int
+  isAvailable  Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+
+  @@index([restaurantId])
+  @@index([category])
+  @@index([priceInCents])
+}
+
+model Customer {
+  id              String   @id
+  name            String
+  email           String   @unique
+  phone           String
+  deliveryAddress String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
+
+  @@index([email])
+}
+
+model Order {
+  id                 String      @id
+  customerId         String
+  restaurantId       String
+  status             String      @default("PENDING")
+  totalAmountInCents Int
+  deliveryAddress    String
+  notes              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  customer           Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant         Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items              OrderItem[]
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id               String   @id
+  orderId          String
+  menuItemId       String
+  name             String
+  quantity         Int
+  unitPriceInCents Int
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
