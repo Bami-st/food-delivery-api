@@ -1,6 +1,7 @@
 import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import path from 'path';
 import { apiRateLimiter } from './middleware/rateLimiter';
 import { notFoundHandler, globalErrorHandler } from './middleware/errorHandler';
 import { restaurantRouter } from './routes/restaurant.routes';
@@ -12,17 +13,22 @@ export function createApp(): Express {
   const app = express();
 
   // Security and common middlewares
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: false, // allow inline scripts in minimal consumer
+  }));
   app.use(cors());
   app.use(express.json());
 
-  // Apply rate limiting to all /api/ endpoints (Stage 5)
-  app.use('/api', apiRateLimiter);
+  // Serve static consumer client (Stage 8)
+  app.use(express.static(path.join(__dirname, '../public')));
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // Apply rate limiting to all /api/ endpoints (Stage 5)
+  app.use('/api', apiRateLimiter);
 
   // REST API v1 Routes
   const apiV1Router = express.Router();
@@ -33,7 +39,7 @@ export function createApp(): Express {
 
   app.use('/api/v1', apiV1Router);
 
-  // 404 handler
+  // 404 handler for API routes
   app.use(notFoundHandler);
 
   // Global unhandled error handler
