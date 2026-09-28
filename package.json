@@ -5,11 +5,11 @@
   "main": "dist/src/index.js",
   "scripts": {
     "dev": "ts-node src/index.ts",
-    "postinstall": "prisma generate",
     "build": "tsc",
     "start": "node dist/src/index.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
     "db:seed": "ts-node --transpile-only prisma/seed.ts",
     "verify:seed": "ts-node --transpile-only scripts/verify-seed.ts",
     "test": "ts-node --transpile-only scripts/test-api.ts"
