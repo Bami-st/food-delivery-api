@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: food-delivery-api
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npx prisma db push && npx ts-node prisma/seed.ts && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: food-delivery-db
+          property: connectionString
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 60000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: PAGINATION_DEFAULT_LIMIT
+        value: 20
+      - key: PAGINATION_MAX_LIMIT
+        value: 100
+
+databases:
+  - name: food-delivery-db
+    plan: free
+    databaseName: food_delivery
+    user: delivery_admin
