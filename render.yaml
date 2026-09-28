@@ -3,7 +3,10 @@ services:
     name: food-delivery-api
     env: node
     plan: free
-    buildCommand: npm install && npx prisma generate && npx prisma db push && npm run db:seed && npm run build
+    # Build: generate Prisma client and compile TypeScript.
+    # Seeding is intentionally excluded — run db:seed manually once after first deploy.
+    buildCommand: npm install && npm run build
+    # prestart script (in package.json) runs "prisma migrate deploy" before each server start.
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
