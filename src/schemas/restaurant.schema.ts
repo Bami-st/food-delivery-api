@@ -4,6 +4,7 @@ import { basePaginationSchema, idParamSchema } from './common.schema';
 export const restaurantParamsSchema = idParamSchema('rest');
 
 export const listRestaurantsQuerySchema = basePaginationSchema.extend({
+  search: z.string().trim().min(1).optional(),
   cuisine: z.string().optional(),
   city: z.string().optional(),
   minRating: z

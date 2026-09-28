@@ -17,9 +17,12 @@ restaurantRouter.get(
   validateRequest({ query: listRestaurantsQuerySchema }),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { limit, cursor, offset, order, sort, cuisine, city, minRating, isOpen } = req.query as any;
+      const { limit, cursor, offset, order, sort, search, cuisine, city, minRating, isOpen } = req.query as any;
 
       const where: Prisma.RestaurantWhereInput = {};
+      if (search) {
+        where.OR = [{ name: { contains: search } }, { city: { contains: search } }];
+      }
       if (cuisine) {
         where.cuisine = { equals: cuisine };
       }

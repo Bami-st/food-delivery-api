@@ -95,8 +95,27 @@ async function runTests() {
       'Filtering ?cuisine=Italian returns only Italian restaurants'
     );
 
-    // TEST 8: Full CRUD on /api/v1/orders
-    // 8a: CREATE (POST)
+    // TEST 8: Search filter on restaurants
+    const searchTerm = (jsonFilter.data[0]?.name || 'Kitchen').split(' ')[0];
+    const resSearch = await fetch(`${baseUrl}/restaurants?search=${encodeURIComponent(searchTerm)}&limit=5`);
+    const jsonSearch = await resSearch.json() as any;
+    assert(
+      resSearch.status === 200 && jsonSearch.data.length > 0 && jsonSearch.data.every((r: any) =>
+        (r.name + ' ' + r.city).toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+      `Searching ?search=${searchTerm} returns only matching restaurants (got ${jsonSearch.data?.length})`
+    );
+
+    // TEST 9: Empty search result set is honest, not an error
+    const resNoHits = await fetch(`${baseUrl}/restaurants?search=zzzzzznotathing`);
+    const jsonNoHits = await resNoHits.json() as any;
+    assert(
+      resNoHits.status === 200 && jsonNoHits.data.length === 0 && jsonNoHits.meta.total === 0,
+      'Search with no matches returns 200 with an empty data array and total 0'
+    );
+
+    // TEST 10: Full CRUD on /api/v1/orders
+    // 10a: CREATE (POST)
     const custRes = await (await fetch(`${baseUrl}/customers?limit=1`)).json() as any;
     const customer = custRes.data[0];
     const menuRes = await (await fetch(`${baseUrl}/restaurants/${firstRest.id}/menu?limit=2`)).json() as any;

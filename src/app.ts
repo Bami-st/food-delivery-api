@@ -14,7 +14,24 @@ export function createApp(): Express {
 
   // Security and common middlewares
   app.use(helmet({
-    contentSecurityPolicy: false, // allow inline scripts in minimal consumer
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        fontSrc: ["'self'"],
+        // The client can be pointed at another API origin from the UI, so
+        // same-origin-only would break a documented feature.
+        connectSrc: ["'self'", 'http:', 'https:'],
+        upgradeInsecureRequests: null,
+      },
+    },
+    crossOriginEmbedderPolicy: false,
   }));
   app.use(cors());
   app.use(express.json());
