@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: food-delivery-api
+    env: node
+    region: frankfurt # Optional: change to a region close to your Supabase database
+    buildCommand: npm install && npx prisma generate
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # Tells Render you will provide this in the dashboard manually
+      - key: DIRECT_URL
+        sync: false

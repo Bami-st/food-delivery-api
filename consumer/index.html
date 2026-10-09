@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Delivery Consumer</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; max-width: 800px; margin: auto; background-color: #f9f9f9; color: #333; }
+        h1 { text-align: center; color: #444; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input, select, button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; transition: 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        #loading { display: none; text-align: center; font-style: italic; color: #666; margin: 20px 0; }
+        #error { display: none; color: white; background: #dc3545; padding: 10px; text-align: center; border-radius: 4px; margin-bottom: 20px; }
+        #results { list-style: none; padding: 0; }
+        .card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0 0 5px 0; color: #007bff; }
+        .card p { margin: 5px 0; color: #555; }
+        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #empty { display: none; text-align: center; font-weight: bold; color: #666; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>Find Restaurants</h1>
+
+    <div class="controls">
+        <input type="text" id="filter-name" placeholder="Search by name...">
+        <select id="sort">
+            <option value="name">Sort by Name</option>
+            <option value="createdAt">Sort by Newest</option>
+        </select>
+        <select id="order">
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+        </select>
+        <button id="apply-filters">Search</button>
+    </div>
+
+    <div id="error"></div>
+    <div id="loading">Loading restaurants...</div>
+    <div id="empty">No restaurants found. Try different filters.</div>
+
+    <ul id="results"></ul>
+
+    <div class="pagination">
+        <button id="prev-page" disabled>Previous Page</button>
+        <span id="page-info">Page 1</span>
+        <button id="next-page" disabled>Next Page</button>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api/v1/restaurants';
+        const LIMIT = 10;
+        let offset = 0;
+        
+        const filterName = document.getElementById('filter-name');
+        const sortSelect = document.getElementById('sort');
+        const orderSelect = document.getElementById('order');
+        const applyBtn = document.getElementById('apply-filters');
+        
+        const resultsList = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error');
+        const emptyDiv = document.getElementById('empty');
+        
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
+
+        const fetchRestaurants = async () => {
+            // UI States
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            emptyDiv.style.display = 'none';
+            resultsList.innerHTML = '';
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+
+            const name = filterName.value.trim();
+            const sort = sortSelect.value;
+            const order = orderSelect.value;
+
+            let query = `?limit=${LIMIT}&offset=${offset}&sort=${sort}&order=${order}`;
+            if (name) query += `&name=${encodeURIComponent(name)}`;
+
+            try {
+                const response = await fetch(`${API_URL}${query}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error?.message || 'Failed to fetch');
+                }
+
+                loadingDiv.style.display = 'none';
+
+                if (data.data.length === 0) {
+                    emptyDiv.style.display = 'block';
+                    pageInfo.textContent = 'No results';
+                } else {
+                    data.data.forEach(rest => {
+                        const li = document.createElement('li');
+                        li.className = 'card';
+                        li.innerHTML = `
+                            <h3>${rest.name}</h3>
+                            <p><strong>Address:</strong> ${rest.address}</p>
+                            <p>${rest.description || 'No description available'}</p>
+                        `;
+                        resultsList.appendChild(li);
+                    });
+
+                    // Pagination state
+                    const meta = data.meta;
+                    const currentPage = Math.floor(meta.offset / meta.limit) + 1;
+                    const totalPages = Math.ceil(meta.totalCount / meta.limit);
+                    
+                    pageInfo.textContent = `Page ${currentPage} of ${totalPages || 1} (Total: ${meta.totalCount})`;
+                    
+                    prevBtn.disabled = offset === 0;
+                    nextBtn.disabled = !meta.hasNextPage;
+                }
+
+            } catch (err) {
+                loadingDiv.style.display = 'none';
+                errorDiv.textContent = `Error: ${err.message}`;
+                errorDiv.style.display = 'block';
+            }
+        };
+
+        // Event Listeners
+        applyBtn.addEventListener('click', () => {
+            offset = 0; // Reset pagination on filter change
+            fetchRestaurants();
+        });
+
+        // Hitting enter on search box
+        filterName.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                offset = 0;
+                fetchRestaurants();
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (offset >= LIMIT) {
+                offset -= LIMIT;
+                fetchRestaurants();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            offset += LIMIT;
+            fetchRestaurants();
+        });
+
+        // Initial Load
+        fetchRestaurants();
+    </script>
+</body>
+</html>
