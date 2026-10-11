@@ -49,10 +49,13 @@ const sendError = (res, statusCode, code, message) => {
 
 // Pagination Helper (Offset based)
 const getPaginationOptions = (req) => {
-  let limit = parseInt(req.query.limit) || 20;
+  let limit = parseInt(req.query.limit);
+  if (isNaN(limit)) limit = 20;
   if (limit > 100) limit = 100;
+  if (limit < 0) limit = 0; // Prevent negative limits taking from the end of lists
   
-  let offset = parseInt(req.query.offset) || 0;
+  let offset = parseInt(req.query.offset);
+  if (isNaN(offset)) offset = 0;
   if (offset < 0) throw new Error('NEGATIVE_OFFSET');
 
   return { limit, offset };

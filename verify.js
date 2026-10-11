@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-const url = 'http://localhost:3000/api/v1';
+const url = 'https://food-delivery-api-1-7iip.onrender.com/api/v1';
 
 function run(cmd, desc) {
     console.log(`\n--- ${desc} ---`);
