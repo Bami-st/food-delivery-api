@@ -9,7 +9,9 @@ const url = process.env.VERIFY_URL || 'http://localhost:3000/api/v1';
 // must be opted into explicitly when running against a remote/production host,
 // because they write real data and consume rate-limit quota for other users.
 // Set ALLOW_REMOTE=true to enable them when VERIFY_URL points to a remote server.
-const isRemote = url !== 'http://localhost:3000/api/v1';
+const parsedUrl = new URL(url);
+const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(parsedUrl.hostname);
+const isRemote = !isLocalhost;
 const allowRemote = process.env.ALLOW_REMOTE === 'true';
 const skipMutations = isRemote && !allowRemote;
 
@@ -105,7 +107,9 @@ async function main() {
                 if (match) {
                     const oId = match[1];
                     // 10. Status update
-                    md += run(`curl -i -s -X PATCH -H "Content-Type: application/json" -d "{\\"status\\":\\"accepted\\"}" "${url}/orders/${oId}"`, 'Order Partial Update (Status)');
+                    const patchPayload = JSON.stringify({ status: 'accepted' });
+                    fs.writeFileSync('payload.json', patchPayload);
+                    md += run(`curl -i -s -X PATCH -H "Content-Type: application/json" -d @payload.json "${url}/orders/${oId}"`, 'Order Partial Update (Status)');
 
                     // 11. Deletion rejection (not pending)
                     md += run(`curl -i -s -X DELETE "${url}/orders/${oId}"`, 'Order Deletion Rejection (Not Pending)');
@@ -149,6 +153,9 @@ async function main() {
         md += `### Rate Limit Rejection and Retry-After\n\n\`\`\`bash\n$ curl -i "${url}/restaurants"\n${rateLimitOutput}\n\`\`\`\n\n`;
     }
 
+    if (fs.existsSync('payload.json')) {
+        try { fs.unlinkSync('payload.json'); } catch (_) {}
+    }
     fs.writeFileSync('./outputs/evidence.md', md);
     console.log('Evidence written to outputs/evidence.md');
 }

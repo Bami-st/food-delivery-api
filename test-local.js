@@ -17,6 +17,20 @@ const https = require('https');
 
 const BASE = process.env.TEST_URL || 'http://localhost:3000/api/v1';
 
+const parsedBase = new URL(BASE);
+const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(parsedBase.hostname);
+const isRemote = !isLocalhost;
+const allowRemote = process.env.ALLOW_REMOTE === 'true';
+const skipMutations = isRemote && !allowRemote;
+
+if (skipMutations) {
+    console.warn(
+        '  [test-local] Running against a remote URL without ALLOW_REMOTE=true.\n' +
+        '               Mutation tests (valid order create/update) will be skipped\n' +
+        '               to protect production data. Set ALLOW_REMOTE=true to run.'
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Minimal HTTP helper
 // ---------------------------------------------------------------------------
@@ -182,45 +196,46 @@ async function runTests() {
                        `got ${r3.body?.error?.code}`);
 
                 // ------------------------------------------------------------------
-                // 7. Valid order creation → 201
+                // 7. Valid order creation → 201 (Mutating)
                 // ------------------------------------------------------------------
-                console.log('\n── Valid order creation ──');
-                const r4 = await request('POST', '/orders', {
-                    customerId: cId,
-                    restaurantId: rId,
-                    items: [{ menuItemId: mId, quantity: 2 }]
-                });
-                assert('POST /orders (valid) → 201',          r4.status === 201,
-                       `got ${r4.status}: ${r4.raw}`);
-                assert('Response has data.id',                typeof r4.body?.data?.id === 'string');
-                assert('Response has data.orderItems array',  Array.isArray(r4.body?.data?.orderItems));
-                assert('Order status is pending',             r4.body?.data?.status === 'pending');
+                if (skipMutations) {
+                    console.log('\n── Valid order creation & lifecycle (SKIPPED on remote) ──');
+                    console.log('  ⚠  Skipping order lifecycle tests on remote host (ALLOW_REMOTE not set).');
+                } else {
+                    console.log('\n── Valid order creation ──');
+                    const r4 = await request('POST', '/orders', {
+                        customerId: cId,
+                        restaurantId: rId,
+                        items: [{ menuItemId: mId, quantity: 2 }]
+                    });
+                    assert('POST /orders (valid) → 201',          r4.status === 201,
+                           `got ${r4.status}: ${r4.raw}`);
+                    assert('Response has data.id',                typeof r4.body?.data?.id === 'string');
+                    assert('Response has data.orderItems array',  Array.isArray(r4.body?.data?.orderItems));
+                    assert('Order status is pending',             r4.body?.data?.status === 'pending');
 
-                if (r4.body?.data?.id) {
-                    const oId = r4.body.data.id;
+                    if (r4.body?.data?.id) {
+                        const oId = r4.body.data.id;
 
-                    // ------------------------------------------------------------------
-                    // 8. PATCH status update → 200
-                    // ------------------------------------------------------------------
-                    console.log('\n── Order status update ──');
-                    const r5 = await request('PATCH', `/orders/${oId}`, { status: 'accepted' });
-                    assert('PATCH /orders/:id (status=accepted) → 200',
-                           r5.status === 200, `got ${r5.status}: ${r5.raw}`);
-                    assert('Updated status is accepted',       r5.body?.data?.status === 'accepted');
+                        // ------------------------------------------------------------------
+                        // 8. PATCH status update → 200
+                        // ------------------------------------------------------------------
+                        console.log('\n── Order status update ──');
+                        const r5 = await request('PATCH', `/orders/${oId}`, { status: 'accepted' });
+                        assert('PATCH /orders/:id (status=accepted) → 200',
+                               r5.status === 200, `got ${r5.status}: ${r5.raw}`);
+                        assert('Updated status is accepted',       r5.body?.data?.status === 'accepted');
 
-                    // ------------------------------------------------------------------
-                    // 9. DELETE non-pending order → 422
-                    // ------------------------------------------------------------------
-                    console.log('\n── Delete non-pending order rejection ──');
-                    const r6 = await request('DELETE', `/orders/${oId}`);
-                    assert('DELETE /orders/:id (accepted order) → 422',
-                           r6.status === 422, `got ${r6.status}: ${r6.raw}`);
-                    assert('Error code is UNPROCESSABLE_ENTITY',
-                           r6.body?.error?.code === 'UNPROCESSABLE_ENTITY');
-
-                    // Cleanup: if we could cancel the order, do so. But since DELETE is
-                    // blocked for non-pending, we can't delete it from here. That's fine —
-                    // we're just running against the test/local DB.
+                        // ------------------------------------------------------------------
+                        // 9. DELETE non-pending order → 422
+                        // ------------------------------------------------------------------
+                        console.log('\n── Delete non-pending order rejection ──');
+                        const r6 = await request('DELETE', `/orders/${oId}`);
+                        assert('DELETE /orders/:id (accepted order) → 422',
+                               r6.status === 422, `got ${r6.status}: ${r6.raw}`);
+                        assert('Error code is UNPROCESSABLE_ENTITY',
+                               r6.body?.error?.code === 'UNPROCESSABLE_ENTITY');
+                    }
                 }
             }
         }
