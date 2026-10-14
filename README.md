@@ -138,11 +138,11 @@ The problem domain describes a food-delivery market. We need **Restaurants** off
 ### Why generated identifiers (UUID v4)
 Using UUIDs instead of sequential integers (like auto-incrementing IDs) for primary keys prevents identifier enumeration (e.g., users cannot guess how many orders or customers exist by looking at `id: 50`). They also make distributed system integration and database merging easier, as collisions are statistically negligible.
 
-### Cursor vs. Offset Pagination
-This API implements **Offset Pagination** (`limit` and `offset`) with server-side defensive clamping.
+### Pagination (Offset-Based)
+This API implements **Offset Pagination** (`limit` and `offset`) with server-side defensive validation.
 - **Why Offset Pagination Was Chosen:** Offset pagination trivially supports dynamic multi-column sorting (e.g., sorting by `name`, `createdAt`, or `priceCents`) without requiring complex synthetic multi-column cursor indexes. It also makes calculating UI pagination metadata simple (total count, page numbers, `hasNextPage`).
-- **When Cursor Pagination is Better:** Cursor pagination is superior for high-velocity write feeds (such as social media streams) where new insertions cause offset drift (skipping or duplicating records). It also prevents deep offset database scanning performance degradation.
-- **Defensive Upper Clamping:** To prevent client-triggered Out-Of-Memory (OOM) crashes and excessive database load, requests specifying `limit > 100` are automatically clamped to `100`. Inverted or negative offsets (`offset < 0`) are explicitly rejected with `400 Bad Request`.
+- **Defensive Upper Clamping:** To prevent client-triggered Out-Of-Memory (OOM) crashes and excessive database load, requests specifying `limit > 100` are automatically clamped to `100`.
+- **Invalid Pagination Values:** Both negative `limit` and negative `offset` are rejected with `400 Bad Request` and the error code `INVALID_PAGINATION`. This ensures clients receive an explicit signal rather than a silent empty result.
 
 ### Response Envelope
 The API enforces a uniform response envelope for both success and errors across all endpoints.
@@ -203,8 +203,8 @@ The API enforces a uniform response envelope for both success and errors across 
 List all restaurants with optional filtering, sorting, and pagination.
 
 - **Query Parameters:**
-  - `limit` (integer, default `20`, max `100`): Number of records to return.
-  - `offset` (integer, default `0`, min `0`): Number of records to skip.
+  - `limit` (integer, default `20`, max `100`, must be ≥ 0): Number of records to return. Values above `100` are clamped to `100`; negative values return `400`.
+  - `offset` (integer, default `0`, must be ≥ 0): Number of records to skip. Negative values return `400`.
   - `name` (string, optional): Case-sensitive substring match on restaurant name.
   - `address` (string, optional): Substring match on address.
   - `sort` (string, optional, default `'createdAt'`): Field to sort by (`name`, `createdAt`).
@@ -472,10 +472,28 @@ npm start
 ```
 
 ### Running Automated Verification
-Run the verification test suite to validate pagination bounds, input filtering, order lifecycles, and rate limiting:
+Run the verification test suite to validate pagination bounds, input filtering, order lifecycles, duplicate item rejection, and rate limiting.
+
+By default the script targets the **local development server** (`http://localhost:3000/api/v1`), so you must start the server first:
+```bash
+npm start
+```
+
+Then in a separate terminal:
 ```bash
 node verify.js
 ```
+
+To run against the live deployed API (required opt-in — mutations and rate-limit tests will run against real data):
+```bash
+VERIFY_URL=https://food-delivery-api-1-7iip.onrender.com/api/v1 ALLOW_REMOTE=true node verify.js
+```
+
+To test read-only checks against the live API without mutation side-effects:
+```bash
+VERIFY_URL=https://food-delivery-api-1-7iip.onrender.com/api/v1 node verify.js
+```
+Mutation and rate-limit tests are skipped automatically when a remote URL is used without `ALLOW_REMOTE=true`.
 
 ---
 

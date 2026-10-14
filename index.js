@@ -52,8 +52,8 @@ const getPaginationOptions = (req) => {
   let limit = parseInt(req.query.limit);
   if (isNaN(limit)) limit = 20;
   if (limit > 100) limit = 100;
-  if (limit < 0) limit = 0; // Prevent negative limits taking from the end of lists
-  
+  if (limit < 0) throw new Error('NEGATIVE_LIMIT'); // Reject negative limits with 400, consistent with negative offset
+
   let offset = parseInt(req.query.offset);
   if (isNaN(offset)) offset = 0;
   if (offset < 0) throw new Error('NEGATIVE_OFFSET');
@@ -86,7 +86,10 @@ const router = express.Router();
 router.get('/restaurants', async (req, res, next) => {
   try {
     let pagination;
-    try { pagination = getPaginationOptions(req); } catch(e) { return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative'); }
+    try { pagination = getPaginationOptions(req); } catch(e) {
+      if (e.message === 'NEGATIVE_LIMIT') return sendError(res, 400, 'INVALID_PAGINATION', 'Limit cannot be negative');
+      return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative');
+    }
     const { limit, offset } = pagination;
 
     // Filtering & Sorting
@@ -124,7 +127,10 @@ router.get('/restaurants/:id', async (req, res, next) => {
 router.get('/restaurants/:id/menu-items', async (req, res, next) => {
   try {
     let pagination;
-    try { pagination = getPaginationOptions(req); } catch(e) { return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative'); }
+    try { pagination = getPaginationOptions(req); } catch(e) {
+      if (e.message === 'NEGATIVE_LIMIT') return sendError(res, 400, 'INVALID_PAGINATION', 'Limit cannot be negative');
+      return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative');
+    }
     const { limit, offset } = pagination;
 
     const restaurant = await prisma.restaurant.findUnique({ where: { id: req.params.id } });
@@ -155,7 +161,10 @@ router.get('/restaurants/:id/menu-items', async (req, res, next) => {
 router.get('/menu-items', async (req, res, next) => {
   try {
     let pagination;
-    try { pagination = getPaginationOptions(req); } catch(e) { return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative'); }
+    try { pagination = getPaginationOptions(req); } catch(e) {
+      if (e.message === 'NEGATIVE_LIMIT') return sendError(res, 400, 'INVALID_PAGINATION', 'Limit cannot be negative');
+      return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative');
+    }
     const { limit, offset } = pagination;
 
     const schema = Joi.object({
@@ -193,7 +202,10 @@ router.get('/menu-items/:id', async (req, res, next) => {
 router.get('/customers', async (req, res, next) => {
   try {
     let pagination;
-    try { pagination = getPaginationOptions(req); } catch(e) { return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative'); }
+    try { pagination = getPaginationOptions(req); } catch(e) {
+      if (e.message === 'NEGATIVE_LIMIT') return sendError(res, 400, 'INVALID_PAGINATION', 'Limit cannot be negative');
+      return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative');
+    }
     const { limit, offset } = pagination;
 
     const schema = Joi.object({
@@ -231,7 +243,10 @@ router.get('/customers/:id', async (req, res, next) => {
 router.get('/orders', async (req, res, next) => {
   try {
     let pagination;
-    try { pagination = getPaginationOptions(req); } catch(e) { return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative'); }
+    try { pagination = getPaginationOptions(req); } catch(e) {
+      if (e.message === 'NEGATIVE_LIMIT') return sendError(res, 400, 'INVALID_PAGINATION', 'Limit cannot be negative');
+      return sendError(res, 400, 'INVALID_PAGINATION', 'Offset cannot be negative');
+    }
     const { limit, offset } = pagination;
 
     const schema = Joi.object({
@@ -301,9 +316,17 @@ router.post('/orders', async (req, res, next) => {
     if (!restaurant) return sendError(res, 422, 'INVALID_REFERENCE', 'Restaurant does not exist');
 
     const menuItemIds = items.map(i => i.menuItemId);
+
+    // Reject duplicate menuItemId entries upfront — combining quantities silently would
+    // hide client mistakes; a clear 422 tells callers to deduplicate before retrying.
+    const uniqueMenuItemIds = new Set(menuItemIds);
+    if (uniqueMenuItemIds.size !== menuItemIds.length) {
+      return sendError(res, 422, 'DUPLICATE_ITEM', 'Duplicate menuItemId entries are not allowed. Each menu item may only appear once per order.');
+    }
+
     const menuItems = await prisma.menuItem.findMany({ where: { id: { in: menuItemIds } } });
-    
-    if (menuItems.length !== new Set(menuItemIds).size) {
+
+    if (menuItems.length !== uniqueMenuItemIds.size) {
       return sendError(res, 422, 'INVALID_REFERENCE', 'One or more menu items do not exist');
     }
 
