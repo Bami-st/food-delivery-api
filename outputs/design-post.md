@@ -19,9 +19,9 @@ If a client needs 5,000 records, they simply traverse the pagination metadata (`
 Try it against our live API! The following `curl` command attempts to fetch 5,000 restaurants, but the API gracefully clamps it to 100, as shown in the `meta` object.
 
 ```bash
-curl -s "http://localhost:3000/api/v1/restaurants?limit=5000" | grep '"meta"' -A 4
+curl -s "https://food-delivery-api-1-7iip.onrender.com/api/v1/restaurants?limit=5000" | grep '"meta"' -A 4
 ```
-*(Note: Replace `localhost:3000` with the actual public URL once deployed!)*
+*(Live Deployed API URL: `https://food-delivery-api-1-7iip.onrender.com`)*
 
 ---
 
